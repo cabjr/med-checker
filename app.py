@@ -1,107 +1,104 @@
 import streamlit as st
 import pandas as pd
-from bs4 import BeautifulSoup
-import os
 
-st.set_page_config(page_title="Medication Interaction Checker")
+st.set_page_config(page_title="Medication Interaction Checker", layout="wide")
 
 st.title("Medication Interaction Checker")
-st.write("Checks medications against full amitriptyline interaction dataset.")
+st.write("Screening tool using uploaded interaction dataset (CSV-based).")
 
 # -----------------------------
-# Load and parse HTML files
+# Load dataset safely
 # -----------------------------
 @st.cache_data
 def load_interactions():
-    interactions = []
+    try:
+        df = pd.read_csv("interactions.csv")
 
-    data_folder = "data"
+        # Clean column names just in case
+        df.columns = [c.strip().lower() for c in df.columns]
 
-    for file in os.listdir(data_folder):
-        if file.endswith(".html"):
-            with open(os.path.join(data_folder, file), "r", encoding="utf-8") as f:
-                soup = BeautifulSoup(f, "lxml")
+        # Ensure required columns exist
+        required = {"drug", "severity", "reason"}
+        if not required.issubset(set(df.columns)):
+            st.error(f"CSV must contain columns: {required}")
+            return pd.DataFrame()
 
-            rows = soup.find_all("tr")
+        # Normalize drug names
+        df["drug"] = df["drug"].astype(str).str.lower().str.strip()
 
-            for row in rows:
-                cols = row.find_all("td")
-                if len(cols) < 3:
-                    continue
+        return df
 
-                drug = cols[0].get_text(strip=True).lower()
-                severity = cols[1].get_text(strip=True)
-                reason = cols[2].get_text(strip=True)
-
-                if drug:
-                    interactions.append({
-                        "drug": drug,
-                        "severity": severity,
-                        "reason": reason
-                    })
-
-    df = pd.DataFrame(interactions)
-    df = df.drop_duplicates(subset=["drug"])
-
-    return df
-
-df_interactions = load_interactions()
-st.write("Loaded rows:", len(df_interactions))
-st.write(df_interactions.head())
-# -----------------------------
-# Normalize function
-# -----------------------------
-def normalize_med(med):
-    return med.strip().lower()
-
-# -----------------------------
-# Check medications
-# -----------------------------
-def check_medications(med_list):
-    results = []
-
-    if len(df_interactions) == 0:
-        st.error("No interaction data loaded. Check your HTML files.")
+    except FileNotFoundError:
+        st.error("interactions.csv not found in repository.")
         return pd.DataFrame()
 
-    for med in med_list:
-        med_clean = med.strip().lower()
+df_interactions = load_interactions()
 
-        match = df_interactions[df_interactions["drug"] == med_clean]
+# -----------------------------
+# Safety check
+# -----------------------------
+if df_interactions.empty:
+    st.warning("No interaction data loaded. Check your CSV file in GitHub.")
+    st.stop()
+
+st.success(f"Loaded {len(df_interactions)} interaction records")
+
+# -----------------------------
+# Input
+# -----------------------------
+med_input = st.text_area(
+    "Enter medications (one per line):",
+    placeholder="fluoxetine\ntramadol\nlisinopril"
+)
+
+# -----------------------------
+# Check logic
+# -----------------------------
+def check_meds(meds, df):
+    results = []
+
+    for med in meds:
+        med_clean = med.lower().strip()
+
+        match = df[df["drug"] == med_clean]
 
         if match.empty:
             results.append({
                 "Medication": med,
                 "Severity": "🟢 None",
-                "Reason": "No interaction found"
+                "Reason": "No interaction found in dataset"
             })
         else:
             row = match.iloc[0]
             results.append({
                 "Medication": med,
-                "Severity": row["severity"],
-                "Reason": row["reason"]
+                "Severity": row.get("severity", "Unknown"),
+                "Reason": row.get("reason", "")
             })
 
     return pd.DataFrame(results)
 
 # -----------------------------
-# UI
+# Run button
 # -----------------------------
-med_input = st.text_area("Paste medication list (one per line):")
-
 if st.button("Check Interactions"):
-    meds = [m for m in med_input.split("\n") if m.strip()]
+
+    meds = [m.strip() for m in med_input.split("\n") if m.strip()]
 
     if not meds:
         st.warning("Please enter at least one medication.")
     else:
-        results_df = check_medications(meds)
+        results_df = check_meds(meds, df_interactions)
+
         st.subheader("Results")
-        st.dataframe(results_df)
+        st.dataframe(results_df, use_container_width=True)
+
+        # Summary counts
+        st.subheader("Summary")
+        st.write(results_df["Severity"].value_counts())
 
 # -----------------------------
 # Footer
 # -----------------------------
 st.markdown("---")
-st.warning("Do not enter PHI. Screening tool only.")
+st.caption("For screening purposes only. Not a substitute for clinical judgment or full drug interaction databases.")
