@@ -130,3 +130,4 @@ if st.button("Check Interactions"):
 # -----------------------------
 st.markdown("---")
 st.caption("For research/clinical support use only. Always apply clinical judgment.")
+st.warning("Do not enter PHI. This tool is for screening purposes only based on FDA labeling.")
