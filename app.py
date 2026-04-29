@@ -46,7 +46,8 @@ def load_interactions():
     return df
 
 df_interactions = load_interactions()
-
+st.write("Loaded rows:", len(df_interactions))
+st.write(df_interactions.head())
 # -----------------------------
 # Normalize function
 # -----------------------------
