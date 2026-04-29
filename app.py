@@ -60,8 +60,12 @@ def normalize_med(med):
 def check_medications(med_list):
     results = []
 
+    if len(df_interactions) == 0:
+        st.error("No interaction data loaded. Check your HTML files.")
+        return pd.DataFrame()
+
     for med in med_list:
-        med_clean = normalize_med(med)
+        med_clean = med.strip().lower()
 
         match = df_interactions[df_interactions["drug"] == med_clean]
 
