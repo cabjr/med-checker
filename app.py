@@ -1,14 +1,15 @@
 import streamlit as st
 import pandas as pd
 import re
+from difflib import get_close_matches
 
 st.set_page_config(page_title="Medication Interaction Checker", layout="wide")
 
 st.title("Medication Interaction Checker")
-st.write("Screening tool using uploaded interaction dataset (CSV-based).")
+st.write("Enhanced screening with fuzzy matching + brand normalization")
 
 # -----------------------------
-# Clean medication names
+# Clean medication names (IMPROVED)
 # -----------------------------
 def clean_med_name(med):
     med = med.lower()
@@ -16,22 +17,39 @@ def clean_med_name(med):
     # remove brand names in parentheses
     med = re.sub(r"\(.*?\)", "", med)
 
-    # remove dosing (everything after numbers)
-    med = re.sub(r"\b\d+.*", "", med)
+    # remove dosing (but KEEP drug name intact)
+    med = re.sub(r"\d+(\.\d+)?\s*(mg|mcg|ml|units?|g)", "", med)
 
-    # remove common extra words
-    remove_words = [
-        "tablet", "capsule", "injection", "pen", "solution",
-        "mg", "mcg", "ml", "unit", "units", "cr", "er"
-    ]
+    # remove formulation words ONLY if separate words
+    med = re.sub(r"\b(tablet|capsule|injection|pen|solution|cr|er)\b", "", med)
 
-    for word in remove_words:
-        med = med.replace(word, "")
+    # clean spaces
+    med = re.sub(r"\s+", " ", med).strip()
 
-    return med.strip()
+    return med
 
 # -----------------------------
-# Format severity with colors
+# Basic brand → generic mapping (expandable)
+# -----------------------------
+brand_map = {
+    "zofran": "ondansetron",
+    "maxalt": "rizatriptan",
+    "zoloft": "sertraline",
+    "prozac": "fluoxetine",
+    "imodium": "loperamide",
+    "pepcid": "famotidine",
+    "entocort": "budesonide",
+    "skyrizi": "risankizumab",
+}
+
+def normalize_brand(name):
+    for brand, generic in brand_map.items():
+        if brand in name:
+            return generic
+    return name
+
+# -----------------------------
+# Format severity
 # -----------------------------
 def format_severity(sev):
     sev = str(sev).lower()
@@ -46,57 +64,63 @@ def format_severity(sev):
         return "🟢 None"
 
 # -----------------------------
-# Load dataset safely
+# Load dataset
 # -----------------------------
 @st.cache_data
 def load_interactions():
     try:
         df = pd.read_csv("interactions.csv")
 
-        # Clean column names
         df.columns = [c.strip().lower() for c in df.columns]
 
-        # Ensure required columns exist
         required = {"drug", "severity", "reason"}
-        if not required.issubset(set(df.columns)):
+        if not required.issubset(df.columns):
             st.error("CSV must contain: drug, severity, reason")
             return pd.DataFrame()
 
-        # Normalize drug names
         df["drug"] = df["drug"].astype(str).str.lower().str.strip()
 
         return df
 
-    except FileNotFoundError:
-        st.error("interactions.csv not found in repository.")
+    except:
+        st.error("Error loading interactions.csv")
         return pd.DataFrame()
 
 df_interactions = load_interactions()
 
-# -----------------------------
-# Stop if no data
-# -----------------------------
 if df_interactions.empty:
-    st.warning("No interaction data loaded. Check your CSV file in GitHub.")
+    st.warning("No interaction data loaded.")
     st.stop()
 
 st.success(f"Loaded {len(df_interactions)} interaction records")
 
 # -----------------------------
-# Check function
+# Fuzzy match function
+# -----------------------------
+def find_best_match(name, df):
+    drug_list = df["drug"].tolist()
+
+    matches = get_close_matches(name, drug_list, n=1, cutoff=0.8)
+
+    return matches[0] if matches else name
+
+# -----------------------------
+# Check meds (UPGRADED)
 # -----------------------------
 def check_meds(meds, df):
     results = []
 
     for med in meds:
         cleaned = clean_med_name(med)
+        normalized = normalize_brand(cleaned)
+        best_match = find_best_match(normalized, df)
 
-        match = df[df["drug"] == cleaned]
+        match = df[df["drug"] == best_match]
 
         if match.empty:
             results.append({
                 "Original Input": med,
-                "Matched Name": cleaned,
+                "Matched Name": best_match,
                 "Severity": format_severity("none"),
                 "Reason": "No interaction found"
             })
@@ -104,7 +128,7 @@ def check_meds(meds, df):
             row = match.iloc[0]
             results.append({
                 "Original Input": med,
-                "Matched Name": cleaned,
+                "Matched Name": best_match,
                 "Severity": format_severity(row.get("severity", "")),
                 "Reason": row.get("reason", "")
             })
@@ -118,7 +142,7 @@ med_input = st.text_area(
     "Enter medications (one per line):",
     placeholder="""ondansetron (ZOFRAN) 4 mg tablet
 rizatriptan (MAXALT) 10 mg tablet
-sertraline 100 mg tablet"""
+sertralin 100 mg tablet"""
 )
 
 # -----------------------------
@@ -143,4 +167,4 @@ if st.button("Check Interactions"):
 # Footer
 # -----------------------------
 st.markdown("---")
-st.caption("For screening purposes only. Not a substitute for clinical judgment.")
+st.caption("Enhanced matching enabled (brand + fuzzy). Use clinical judgment.")
