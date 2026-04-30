@@ -1,4 +1,4 @@
-import streamlit as st
+mport streamlit as st
 import pandas as pd
 import re
 from difflib import get_close_matches
@@ -9,7 +9,7 @@ st.title("Medication Interaction Checker")
 st.write("Enhanced screening with fuzzy matching + brand normalization")
 
 # -----------------------------
-# Clean medication names (IMPROVED)
+# Clean medication names
 # -----------------------------
 def clean_med_name(med):
     med = med.lower()
@@ -17,19 +17,19 @@ def clean_med_name(med):
     # remove brand names in parentheses
     med = re.sub(r"\(.*?\)", "", med)
 
-    # remove dosing (but KEEP drug name intact)
+    # remove dosing but keep drug name intact
     med = re.sub(r"\d+(\.\d+)?\s*(mg|mcg|ml|units?|g)", "", med)
 
-    # remove formulation words ONLY if separate words
+    # remove formulation words only if separate
     med = re.sub(r"\b(tablet|capsule|injection|pen|solution|cr|er)\b", "", med)
 
-    # clean spaces
+    # normalize spaces
     med = re.sub(r"\s+", " ", med).strip()
 
     return med
 
 # -----------------------------
-# Basic brand → generic mapping (expandable)
+# Brand → generic mapping
 # -----------------------------
 brand_map = {
     "zofran": "ondansetron",
@@ -95,17 +95,15 @@ if df_interactions.empty:
 st.success(f"Loaded {len(df_interactions)} interaction records")
 
 # -----------------------------
-# Fuzzy match function
+# Fuzzy match
 # -----------------------------
 def find_best_match(name, df):
     drug_list = df["drug"].tolist()
-
     matches = get_close_matches(name, drug_list, n=1, cutoff=0.8)
-
     return matches[0] if matches else name
 
 # -----------------------------
-# Check meds (UPGRADED)
+# Check meds
 # -----------------------------
 def check_meds(meds, df):
     results = []
@@ -136,21 +134,38 @@ def check_meds(meds, df):
     return pd.DataFrame(results)
 
 # -----------------------------
-# Input
+# Session state for input
 # -----------------------------
+if "med_input" not in st.session_state:
+    st.session_state.med_input = ""
+
 med_input = st.text_area(
     "Enter medications (one per line):",
+    key="med_input",
     placeholder="""ondansetron (ZOFRAN) 4 mg tablet
 rizatriptan (MAXALT) 10 mg tablet
 sertralin 100 mg tablet"""
 )
 
 # -----------------------------
-# Run check
+# Buttons (side-by-side)
 # -----------------------------
-if st.button("Check Interactions"):
+col1, col2 = st.columns(2)
 
-    meds = [m.strip() for m in med_input.split("\n") if m.strip()]
+with col1:
+    check_clicked = st.button("Check Interactions")
+
+with col2:
+    clear_clicked = st.button("Clear")
+
+# Clear action
+if clear_clicked:
+    st.session_state.med_input = ""
+    st.rerun()
+
+# Check action
+if check_clicked:
+    meds = [m.strip() for m in st.session_state.med_input.split("\n") if m.strip()]
 
     if not meds:
         st.warning("Please enter at least one medication.")
