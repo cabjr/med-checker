@@ -2,6 +2,14 @@ import streamlit as st
 import pandas as pd
 import re
 
+st.set_page_config(page_title="Medication Interaction Checker", layout="wide")
+
+st.title("Medication Interaction Checker")
+st.write("Screening tool using uploaded interaction dataset (CSV-based).")
+
+# -----------------------------
+# Clean medication names
+# -----------------------------
 def clean_med_name(med):
     med = med.lower()
 
@@ -21,10 +29,6 @@ def clean_med_name(med):
         med = med.replace(word, "")
 
     return med.strip()
-st.set_page_config(page_title="Medication Interaction Checker", layout="wide")
-
-st.title("Medication Interaction Checker")
-st.write("Screening tool using uploaded interaction dataset (CSV-based).")
 
 # -----------------------------
 # Load dataset safely
@@ -34,13 +38,13 @@ def load_interactions():
     try:
         df = pd.read_csv("interactions.csv")
 
-        # Clean column names just in case
+        # Clean column names
         df.columns = [c.strip().lower() for c in df.columns]
 
         # Ensure required columns exist
         required = {"drug", "severity", "reason"}
         if not required.issubset(set(df.columns)):
-            st.error(f"CSV must contain columns: {required}")
+            st.error("CSV must contain: drug, severity, reason")
             return pd.DataFrame()
 
         # Normalize drug names
@@ -55,7 +59,7 @@ def load_interactions():
 df_interactions = load_interactions()
 
 # -----------------------------
-# Safety check
+# Stop if no data
 # -----------------------------
 if df_interactions.empty:
     st.warning("No interaction data loaded. Check your CSV file in GitHub.")
@@ -64,40 +68,46 @@ if df_interactions.empty:
 st.success(f"Loaded {len(df_interactions)} interaction records")
 
 # -----------------------------
+# Check function
+# -----------------------------
+def check_meds(meds, df):
+    results = []
+
+    for med in meds:
+        cleaned = clean_med_name(med)
+
+        match = df[df["drug"] == cleaned]
+
+        if match.empty:
+            results.append({
+                "Original Input": med,
+                "Matched Name": cleaned,
+                "Severity": "🟢 None",
+                "Reason": "No interaction found"
+            })
+        else:
+            row = match.iloc[0]
+            results.append({
+                "Original Input": med,
+                "Matched Name": cleaned,
+                "Severity": row.get("severity", "Unknown"),
+                "Reason": row.get("reason", "")
+            })
+
+    return pd.DataFrame(results)
+
+# -----------------------------
 # Input
 # -----------------------------
 med_input = st.text_area(
     "Enter medications (one per line):",
-    placeholder="fluoxetine\ntramadol\nlisinopril"
+    placeholder="""ondansetron (ZOFRAN) 4 mg tablet
+rizatriptan (MAXALT) 10 mg tablet
+sertraline 100 mg tablet"""
 )
 
 # -----------------------------
-# Check logic
-# -----------------------------
-import re
-
-def clean_med_name(med):
-    med = med.lower()
-
-    # remove brand names in parentheses
-    med = re.sub(r"\(.*?\)", "", med)
-
-    # remove dosing (everything after numbers)
-    med = re.sub(r"\b\d+.*", "", med)
-
-    # remove common extra words
-    remove_words = [
-        "tablet", "capsule", "injection", "pen", "solution",
-        "mg", "mcg", "ml", "unit", "units", "cr", "er"
-    ]
-
-    for word in remove_words:
-        med = med.replace(word, "")
-
-    return med.strip()
-
-# -----------------------------
-# Run button
+# Run check
 # -----------------------------
 if st.button("Check Interactions"):
 
@@ -111,7 +121,6 @@ if st.button("Check Interactions"):
         st.subheader("Results")
         st.dataframe(results_df, use_container_width=True)
 
-        # Summary counts
         st.subheader("Summary")
         st.write(results_df["Severity"].value_counts())
 
@@ -119,4 +128,4 @@ if st.button("Check Interactions"):
 # Footer
 # -----------------------------
 st.markdown("---")
-st.caption("For screening purposes only. Not a substitute for clinical judgment or full drug interaction databases.")
+st.caption("For screening purposes only. Not a substitute for clinical judgment.")
