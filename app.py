@@ -31,6 +31,21 @@ def clean_med_name(med):
     return med.strip()
 
 # -----------------------------
+# Format severity with colors
+# -----------------------------
+def format_severity(sev):
+    sev = str(sev).lower()
+
+    if "major" in sev:
+        return "🔴 Major"
+    elif "moderate" in sev:
+        return "🟠 Moderate"
+    elif "minor" in sev:
+        return "🟡 Minor"
+    else:
+        return "🟢 None"
+
+# -----------------------------
 # Load dataset safely
 # -----------------------------
 @st.cache_data
@@ -82,7 +97,7 @@ def check_meds(meds, df):
             results.append({
                 "Original Input": med,
                 "Matched Name": cleaned,
-                "Severity": "🟢 None",
+                "Severity": format_severity("none"),
                 "Reason": "No interaction found"
             })
         else:
@@ -90,7 +105,7 @@ def check_meds(meds, df):
             results.append({
                 "Original Input": med,
                 "Matched Name": cleaned,
-                "Severity": row.get("severity", "Unknown"),
+                "Severity": format_severity(row.get("severity", "")),
                 "Reason": row.get("reason", "")
             })
 
