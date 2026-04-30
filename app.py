@@ -13,10 +13,25 @@ st.write("Enhanced screening with fuzzy matching + brand normalization")
 # -----------------------------
 def clean_med_name(med):
     med = med.lower()
+
+    # remove anything in parentheses (brand names)
     med = re.sub(r"\(.*?\)", "", med)
+
+    # remove dosing (numbers + units)
     med = re.sub(r"\d+(\.\d+)?\s*(mg|mcg|ml|units?|g)", "", med)
-    med = re.sub(r"\b(tablet|capsule|injection|pen|solution|cr|er)\b", "", med)
+
+    # remove time-release terms
+    med = re.sub(r"\b(hr|hour|hours|extended|release|er|xr|sr)\b", "", med)
+
+    # remove formulation words
+    med = re.sub(r"\b(tablet|capsule|injection|pen|solution)\b", "", med)
+
+    # remove hyphens and weird characters
+    med = re.sub(r"[^a-z\s]", " ", med)
+
+    # collapse spaces
     med = re.sub(r"\s+", " ", med).strip()
+
     return med
 
 # -----------------------------
