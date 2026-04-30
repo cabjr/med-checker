@@ -58,20 +58,22 @@ def check_meds(meds, df):
     results = []
 
     for med in meds:
-        med_clean = med.lower().strip()
+        clean = clean_med_name(med)
 
-        match = df[df["drug"] == med_clean]
+        match = df[df["drug"] == clean]
 
         if match.empty:
             results.append({
-                "Medication": med,
+                "Original Input": med,
+                "Matched Name": clean,
                 "Severity": "🟢 None",
-                "Reason": "No interaction found in dataset"
+                "Reason": "No interaction found"
             })
         else:
             row = match.iloc[0]
             results.append({
-                "Medication": med,
+                "Original Input": med,
+                "Matched Name": clean,
                 "Severity": row.get("severity", "Unknown"),
                 "Reason": row.get("reason", "")
             })
