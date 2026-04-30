@@ -134,11 +134,17 @@ def check_meds(meds, df):
     return pd.DataFrame(results)
 
 # -----------------------------
-# Session state for input
+# Session state
 # -----------------------------
 if "med_input" not in st.session_state:
     st.session_state.med_input = ""
 
+if "results_df" not in st.session_state:
+    st.session_state.results_df = None
+
+# -----------------------------
+# Input box
+# -----------------------------
 med_input = st.text_area(
     "Enter medications (one per line):",
     key="med_input",
@@ -148,7 +154,7 @@ sertralin 100 mg tablet"""
 )
 
 # -----------------------------
-# Buttons (side-by-side)
+# Buttons
 # -----------------------------
 col1, col2 = st.columns(2)
 
@@ -161,6 +167,7 @@ with col2:
 # Clear action
 if clear_clicked:
     st.session_state.med_input = ""
+    st.session_state.results_df = None
     st.rerun()
 
 # Check action
@@ -170,13 +177,17 @@ if check_clicked:
     if not meds:
         st.warning("Please enter at least one medication.")
     else:
-        results_df = check_meds(meds, df_interactions)
+        st.session_state.results_df = check_meds(meds, df_interactions)
 
-        st.subheader("Results")
-        st.dataframe(results_df, use_container_width=True)
+# -----------------------------
+# Display results
+# -----------------------------
+if st.session_state.results_df is not None:
+    st.subheader("Results")
+    st.dataframe(st.session_state.results_df, use_container_width=True)
 
-        st.subheader("Summary")
-        st.write(results_df["Severity"].value_counts())
+    st.subheader("Summary")
+    st.write(st.session_state.results_df["Severity"].value_counts())
 
 # -----------------------------
 # Footer
