@@ -1,6 +1,26 @@
 import streamlit as st
 import pandas as pd
+import re
 
+def clean_med_name(med):
+    med = med.lower()
+
+    # remove brand names in parentheses
+    med = re.sub(r"\(.*?\)", "", med)
+
+    # remove dosing (everything after numbers)
+    med = re.sub(r"\b\d+.*", "", med)
+
+    # remove common extra words
+    remove_words = [
+        "tablet", "capsule", "injection", "pen", "solution",
+        "mg", "mcg", "ml", "unit", "units", "cr", "er"
+    ]
+
+    for word in remove_words:
+        med = med.replace(word, "")
+
+    return med.strip()
 st.set_page_config(page_title="Medication Interaction Checker", layout="wide")
 
 st.title("Medication Interaction Checker")
@@ -54,31 +74,27 @@ med_input = st.text_area(
 # -----------------------------
 # Check logic
 # -----------------------------
-def check_meds(meds, df):
-    results = []
+import re
 
-    for med in meds:
-        clean = clean_med_name(med)
+def clean_med_name(med):
+    med = med.lower()
 
-        match = df[df["drug"] == clean]
+    # remove brand names in parentheses
+    med = re.sub(r"\(.*?\)", "", med)
 
-        if match.empty:
-            results.append({
-                "Original Input": med,
-                "Matched Name": clean,
-                "Severity": "🟢 None",
-                "Reason": "No interaction found"
-            })
-        else:
-            row = match.iloc[0]
-            results.append({
-                "Original Input": med,
-                "Matched Name": clean,
-                "Severity": row.get("severity", "Unknown"),
-                "Reason": row.get("reason", "")
-            })
+    # remove dosing (everything after numbers)
+    med = re.sub(r"\b\d+.*", "", med)
 
-    return pd.DataFrame(results)
+    # remove common extra words
+    remove_words = [
+        "tablet", "capsule", "injection", "pen", "solution",
+        "mg", "mcg", "ml", "unit", "units", "cr", "er"
+    ]
+
+    for word in remove_words:
+        med = med.replace(word, "")
+
+    return med.strip()
 
 # -----------------------------
 # Run button
